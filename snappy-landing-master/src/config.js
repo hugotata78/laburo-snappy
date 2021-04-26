@@ -1,35 +1,29 @@
-import firebase from 'firebase/app'
-import 'firebase/firestore'
-import 'firebase/storage'
+import firebase from "firebase/app";
+import "firebase/firestore";
+import "firebase/storage";
 
 const config = {
-  apiKey: "AIzaSyCesEv-dO8tdkpKM9wcHbLkzu0oYazHgOc",
-  authDomain: "snappy-landing-master.firebaseapp.com",
-  projectId: "snappy-landing-master",
-  storageBucket: "snappy-landing-master.appspot.com",
-  messagingSenderId: "230022164574",
-  appId: "1:230022164574:web:8d5e8a814185f86efc44cf"
+  apiKey: "AIzaSyAFFbaKQz4viDoCG746W_Tsi5I_0gjHMe8",
+  authDomain: "snappy-data-base.firebaseapp.com",
+  projectId: "snappy-data-base",
+  storageBucket: "snappy-data-base.appspot.com",
+  messagingSenderId: "801417452234",
+  appId: "1:801417452234:web:d0495500b6f5b5716d3233",
 };
 
-const app = firebase.initializeApp(config)
-const db = app.firestore()
-const storage = firebase.storage()
-const coleccion = db.collection('comentarios')
+const app = firebase.initializeApp(config);
+const db = app.firestore();
+const storage = firebase.storage();
+const coleccion = db.collection("comentarios");
 
-const obtenerComentarios = ()=>{
-  let comentarios = []
-  coleccion.get()
-  .then(res=>{
-   res.docs.map(item=>{
-     comentarios.push(item.data())
-    })
-  })
-  return comentarios
-}
-console.log(obtenerComentarios()[0])
-export{
-  db,
-  storage,
-  
-} 
-  
+const obtenerComentarios = () => {
+  let comentarios = [];
+  coleccion.get().then((res) => {
+    res.docs.map((item) => {
+      comentarios.push(item.data());
+    });
+  });
+  return comentarios;
+};
+console.log(obtenerComentarios());
+export { db, storage };
