@@ -1,0 +1,137 @@
+stages:
+  - lint
+  - build
+  - review
+  - deploy
+
+lint:
+  stage: lint
+  image: node
+
+  # artifacts:
+  #   paths:
+  #     - dist
+  #   expire_in: 1 hour
+
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+    - node_modules/
+
+  before_script:
+    - yarn install
+
+  script:
+    - yarn staging-eslint
+
+  only: [merge_requests]
+
+  tags:
+    - lint
+
+build:
+  stage: build
+  image: node:12.16.0
+
+  artifacts:
+    paths:
+      - dist
+    expire_in: 1 hour
+
+  variables:
+    GIT_SUBMODULE_STRATEGY: recursive
+
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+    - node_modules/
+
+  before_script:
+  - yarn install
+
+  script:
+  - yarn build
+
+  tags:
+    - build
+
+  only: [merge_requests, master]
+
+deploy web:
+  only:
+    refs:
+      - master
+
+  stage: deploy
+  image: wilson208/circleci-awscli:node
+
+  dependencies:
+    - build
+
+  script:
+  - aws s3 rm s3://snappylabs.io --recursive
+  - aws s3 cp --recursive ./dist s3://snappylabs.io/
+  - 'curl -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" --data "{\"purge_everything\":true}" -H "Content-Type: application/json" -H "Auhtorization: Bearer ${CF_KEY}"'
+
+  tags:
+    - deploy
+
+review:
+  stage: review
+  image: instrumentisto/rsync-ssh:latest
+
+  dependencies:
+    - build
+
+  before_script:
+    - 'which rsync || ( apt-get update -y && apt-get install rsync -y )'
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+
+  script:
+    - rsync -av --delete -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" ./dist/ $SSH_USER@$SSH_TARGET_IP:/srv/nginx/pages/$CI_MERGE_REQUEST_ID
+
+  environment:
+    name: review/$CI_MERGE_REQUEST_ID
+    url: https://$CI_MERGE_REQUEST_ID.preview.snappylabs.io/
+    on_stop: stop_review
+    auto_stop_in: 1 week
+
+  only: [merge_requests]
+  except: [master]
+
+  tags:
+    - review-apps
+
+stop_review:
+  stage: review
+  image: instrumentisto/rsync-ssh:latest
+
+  before_script:
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+
+  script:
+    - ssh -o StrictHostKeyChecking=no $SSH_USER@$SSH_TARGET_IP "rm -r /srv/nginx/pages/${CI_MERGE_REQUEST_ID}/"
+
+  when: manual
+
+  environment:
+    name: review/$CI_MERGE_REQUEST_ID
+    action: stop
+
+  only: [merge_requests]
+  except: [master]
+
+  tags:
+    - review-apps
+
